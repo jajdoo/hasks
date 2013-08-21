@@ -13,4 +13,5 @@ executable hasks
                    time,
                    deepseq
   ghc-options:     -Wall
+  other-modules:   RBTree
 

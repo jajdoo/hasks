@@ -23,11 +23,10 @@ module MyAVLTree (
 ) where
 
 import Data.List
-import Data.Int
 
 data Tree a =   Empty |
                 Branch {    key     :: a,
-                            balance :: Int8,
+                            balance :: Int,
                             left    :: Tree a,
                             right   :: Tree a,
                             up      :: Bool    --used internally to stop updating balance
@@ -38,37 +37,97 @@ leaf :: (Ord a, Eq a) => a -> Tree a
 leaf x = Branch x 0 Empty Empty True
 
 -- insert ------------------------------------
-treeInsert :: (Eq a, Ord a) => Tree a -> a -> Tree a
+treeInsert :: Ord a => Tree a -> a -> Tree a
 treeInsert Empty x  = leaf x
-treeInsert (Branch y b l r _) x | x<y           = let nl@(Branch _ _ _ _ nlu) = treeInsert l x
-                                                  in 
-                                                        if nlu then if b==1 then roll $ Branch y 2       nl r False 
-                                                                            else        Branch y (b + 1) nl r (b /= (-1)) 
-                                                               else Branch y b nl r False
-                                                  
-                                | x>y           = let nr@(Branch _ _ _ _ nru) = treeInsert r x
-                                                  in 
-                                                        if nru then if b==(-1) then roll $ Branch y (-2)    l nr False 
-                                                                               else        Branch y (b - 1) l nr (b /= 1) 
-                                                               else Branch y b l nr False
-                                                  
-                                | otherwise     = Branch x b l r False
+treeInsert (Branch y b l r _) x 
+  | x < y =
+    let nl@(Branch _ _ _ _ nlu) = treeInsert l x   -- nl = new left
+    in
+      if nlu
+        then if b==1  
+               then roll $ Branch y  2      nl r False 
+               else        Branch y (b + 1) nl r (b /= (-1)) 
+        else               Branch y  b      nl r False
+  | x > y = 
+    let nr@(Branch _ _ _ _ nru) = treeInsert r x   -- nr = new right
+    in
+      if nru 
+        then 
+        if b==(-1) 
+               then roll $ Branch y (-2)    l nr False 
+               else        Branch y (b - 1) l nr (b /= 1) 
+        else               Branch y  b      l nr False
+        
+  | otherwise =            Branch x  b      l r  False
 
 
 -- rolls -------------------------------------
 roll :: (Eq a, Ord a) => Tree a -> Tree a
+roll (Branch y b l r _) = 
+        case b of 
+        2 -> case lb of
+                1  -> Branch ly  0 ll (Branch y 0 lr r False) False --ll roll
+                -1 -> case lrb of --lr rolls
+                        0  ->  Branch lry 0 (Branch ly 0   ll  lrl False) 
+                                            (Branch y  0   lrr r   False) False
+                        1  ->  Branch lry 0 (Branch ly 0   ll  lrl False) 
+                                            (Branch y (-1) lrr r   False) False
+                        -1 ->  Branch lry 0 (Branch ly 1   ll  lrl False) 
+                                            (Branch y  0   lrr r   False) False
+                                
+        -- rr, rl
+        -2 -> case rb of
+                -1 -> Branch ry  0 (Branch y 0 l rl False) rr False --rr roll
+                1 ->  case rlb of --rl rolls
+                        0  -> Branch rly 0 (Branch y  0    l   rll False) 
+                                           (Branch ry 0    rlr rr  False) False
+                        1  -> Branch rly 0 (Branch y  0    l   rll False) 
+                                           (Branch ry (-1) rlr rr  False) False
+                        -1 -> Branch rly 0 (Branch y  1    l   rll False) 
+                                           (Branch ry 0    rlr rr  False) False
+        where
+        (Branch ly lb ll lr _) = l
+        (Branch ry rb rl rr _) = r
+        (Branch lry lrb lrl lrr _) = lr
+        (Branch rly rlb rll rlr _) = rl
+        
+
+{-
+roll :: (Eq a, Ord a) => Tree a -> Tree a
 -- ll roll
-roll (Branch y 2 (Branch ly 1 ll lr _) r _) = Branch ly 0 ll (Branch y 0 lr r False) False
+roll (Branch y 2 (Branch ly 1 ll lr _) r _) = 
+        Branch ly  0 ll (Branch y 0 lr r False) False
+        
 -- rr roll
-roll (Branch y (-2) l (Branch ry (-1) rl rr _) _) = Branch ry 0 (Branch y 0 l rl False) rr False
+roll (Branch y (-2) l (Branch ry (-1) rl rr _) _) = 
+        Branch ry  0 (Branch y 0 l rl False) rr False
+        
 -- lr rolls
-roll (Branch y 2 (Branch ly (-1) ll (Branch lry lrb lrl lrr _) _) r _) = case lrb of 0  -> Branch lry 0 (Branch ly 0 ll lrl False) (Branch y   0  lrr r False) False
-                                                                                     1  -> Branch lry 0 (Branch ly 0 ll lrl False) (Branch y (-1) lrr r False) False
-                                                                                     -1 -> Branch lry 0 (Branch ly 1 ll lrl False) (Branch y   0  lrr r False) False
+roll (Branch y 2 (Branch ly (-1) ll (Branch lry 0 lrl lrr _) _) r _) = 
+        Branch lry 0 (Branch ly 0   ll  lrl False) 
+                     (Branch y  0   lrr r   False) False
+                     
+roll (Branch y 2 (Branch ly (-1) ll (Branch lry 1 lrl lrr _) _) r _) = 
+        Branch lry 0 (Branch ly 0   ll  lrl False) 
+                     (Branch y (-1) lrr r   False) False
+                     
+roll (Branch y 2 (Branch ly (-1) ll (Branch lry (-1) lrl lrr _) _) r _) = 
+        Branch lry 0 (Branch ly 1   ll  lrl False) 
+                     (Branch y  0   lrr r   False) False
+                     
 -- rl rolls
-roll (Branch y (-2) l (Branch ry 1 (Branch rly rlb rll rlr _) rr _) _) = case rlb of 0  -> Branch rly 0 (Branch y 0 l rll False) (Branch ry   0  rlr rr False) False
-                                                                                     1  -> Branch rly 0 (Branch y 0 l rll False) (Branch ry (-1) rlr rr False) False
-                                                                                     -1 -> Branch rly 0 (Branch y 1 l rll False) (Branch ry   0  rlr rr False) False
+roll (Branch y (-2) l (Branch ry 1 (Branch rly 0 rll rlr _) rr _) _) =
+        Branch rly 0 (Branch y  0   l   rll False) 
+                     (Branch ry 0   rlr rr  False) False
+                         
+roll (Branch y (-2) l (Branch ry 1 (Branch rly 1 rll rlr _) rr _) _) =
+        Branch rly 0 (Branch y  0   l   rll False) 
+                     (Branch ry (-1) rlr rr False) False
+                         
+roll (Branch y (-2) l (Branch ry 1 (Branch rly (-1) rll rlr _) rr _) _) = 
+        Branch rly 0 (Branch y  1   l   rll False) 
+                     (Branch ry 0   rlr rr  False) False
+-} 
 
 
 -- construct a tree --------------------------
